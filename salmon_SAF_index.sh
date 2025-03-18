@@ -42,7 +42,7 @@ gtf2tx2gene() {
   fi
 
   local input="$1"
-  local output="${2:-tx2gene_ensemble1.tsv}"
+  local output="${2:-tx2gene_ensemble.tsv}"
 
   zless "$input" | grep -v "^#" | \
   awk 'BEGIN {
