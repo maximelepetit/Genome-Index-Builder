@@ -84,16 +84,20 @@ gtf2tx2gene() {
 
 
 usage() {
-    echo "$(date) usage: $0 -PathOutputReference <path> -species <name> [-threads <num> -fasta <path> -gtf <path>]
-    -PathOutputReference : Directory where reference will be created (required)
-    -species : Organism type of sample, usually referring to species. (required)
-    -condaEnv: CondaEnv with salmon (required)
-    -threads : the number of threads to be used in running the pipeline (default: 4) (optional)
-    -PathGenFastaFile : path to custom .fa file (optional)
-    -PathTranFastaFile : path to custom .fa file (optional)
-    -tx2gene : Create tx2gene file (optional)
-    -PathGtfFile : path to custom .gtf file (optional)
+    echo "$(date) usage: $0 -PathOutputReference <path> -species <name> -condaEnv <env> [-threads <num> -PathGenFastaFile <path> -PathTranFastaFile <path> -tx2gene -PathGtfFile <path>]
     
+    Required arguments:
+    -PathOutputReference : Directory where reference will be created.
+    -species : Organism type of sample, usually referring to species.
+    -condaEnv : Conda environment with Salmon installed.
+
+    Optional arguments:
+    -threads : Number of threads to use (default: 4).
+    -PathGenFastaFile : Path to genome FASTA file.
+    -PathTranFastaFile : Path to transcript FASTA file.
+    -tx2gene : Flag to create a tx2gene file (no value required).
+    -PathGtfFile : Path to GTF annotation file.
+
     "
     exit 1
 }
@@ -102,9 +106,6 @@ threads=4
 LC_TIME=fr_FR.UTF-8
 condaEnv=salmon
 
-if [[ $# -lt 6 || $# -gt 12 ]]; then
-    usage
-fi
 
 while [[ -n "$1" ]]; do
     case "$1" in
@@ -122,7 +123,8 @@ while [[ -n "$1" ]]; do
 done
 
 # Check for mandatory arguments
-if [[ -z "$PathOutputReference" || -z "$species" ]]; then
+if [[ -z "$PathOutputReference" || -z "$species" || -z "$condaEnv" ]]; then
+    echo "Error: Missing required arguments."
     usage
 fi
 
@@ -176,7 +178,7 @@ dateSuffix=$(date '+%Y_%m_%d')
 referenceDir="$PathOutputReference/$species/$dateSuffix"
 
 if [ -d "$referenceDir" ]; then
-    echo "Directory $referenceDir already exist. Remove $referenceDir please or wait one minutes"
+    echo "Directory $referenceDir already exist. Remove $referenceDir"
     exit 1
 else
     echo "Directory $referenceDir does not exist. Creating directory."
@@ -189,7 +191,7 @@ echo "Using $referenceDir for your operations."
 
 
 # Create necessary directories
-mkdir -p "$referenceDir/genome/cdna" "$referenceDir/genome/dna" "$referenceDir/genes"
+mkdir -p "$referenceDir/genome/cdna" "$referenceDir/genome/dna" 
 
 cd "$referenceDir" || {
     echo "$(date) - Failed to change directory to $referenceDir"
@@ -205,25 +207,25 @@ if [[ -n "$PathGenFastaFile" && -n "$PathTranFastaFile" ]]; then
     
     if [[ "$PathGenFastaFile" == *.gz ]]; then
         
-        genomeFastaFiles=$(find "${referenceDir}/genome/dna/" -type f -name "$(basename "$PathGenFastaFile" .gz)" | head -n 1)
+        genomeFastaFiles=$(find "${referenceDir}/genome/dna/" -type f -name "$(basename "$PathGenFastaFile")" | head -n 1)
     else
-    gzip -f "$referenceDir/genome/dna/$(basename "$PathGenFastaFile")"
+        gzip -f "$referenceDir/genome/dna/$(basename "$PathGenFastaFile")"
         genomeFastaFiles=$(find "${referenceDir}/genome/dna/" -type f -name "$(basename "$PathGenFastaFile")" | head -n 1)
     fi
 
     if [[ "$PathTranFastaFile" == *.gz ]]; then
   
-        transcriptomeFastaFiles=$(find "${referenceDir}/genome/cdna/" -type f -name "$(basename "$PathTranFastaFile" .gz)" | head -n 1)
+        transcriptomeFastaFiles=$(find "${referenceDir}/genome/cdna/" -type f -name "$(basename "$PathTranFastaFile")" | head -n 1)
     else
         gzip -f "$referenceDir/genome/cdna/$(basename "$PathTranFastaFile")"
         transcriptomeFastaFiles=$(find "${referenceDir}/genome/cdna/" -type f -name "$(basename "$PathTranFastaFile")" | head -n 1)
     fi
 
     echo "$(date) - Creating decoys files ..."
-    
+     echo $genomeFastaFiles
 
     grep "^>" <(gunzip -c $genomeFastaFiles) | cut -d " " -f 1 > ${referenceDir}/genome/decoys.txt
-    sed -i.bak -e 's/>//g' ${PathOutputReference}/decoys.txt
+    sed -i.bak -e 's/>//g' ${referenceDir}/genome/decoys.txt
 
 
     cat ${transcriptomeFastaFiles} ${genomeFastaFiles} > ${referenceDir}/genome/gentrome.fa.gz
@@ -272,14 +274,12 @@ else
     echo "$(date) - The DNA and cDNA fasta files have been downloaded successfully"
 
 
-    genomeFastaFiles=$(find "${referenceDir}/genome/dna/" -type f -regex "*.dna.\(primary_assembly\|toplevel\).fa.gz" | head -n 1)
-    transcriptomeFastaFiles=$(find "${referenceDir}/genome/cdna/" -type f -regex "*.cdna.all.fa.gz" | head -n 1)
-
+    genomeFastaFiles=$(find "${referenceDir}/genome/dna" -type f -regex ".*\.dna\.\(primary_assembly\|toplevel\)\.fa\.gz" | head -n 1)
+    transcriptomeFastaFiles=$(find "${referenceDir}/genome/cdna/" -type f -regex ".*\.cdna\.all\.fa\.gz" | head -n 1)
     echo "$(date) - Creating decoys files ..."
-    
 
     grep "^>" <(gunzip -c $genomeFastaFiles) | cut -d " " -f 1 > ${referenceDir}/genome/decoys.txt
-    sed -i.bak -e 's/>//g' ${PathOutputReference}/decoys.txt
+    sed -i.bak -e 's/>//g' ${referenceDir}/genome/decoys.txt
 
 
     cat ${transcriptomeFastaFiles} ${genomeFastaFiles} > ${referenceDir}/genome/gentrome.fa.gz
@@ -299,6 +299,7 @@ fi
 
 
 if [[ "$tx2gene_flag" -eq 1 ]]; then  # Run ONLY if -tx2gene flag is provided
+   
     if [[ -f "$PathGtfFile" && ( "$PathGtfFile" == *.gtf || "$PathGtfFile" == *.gtf.gz ) ]]; then
         echo "$(date) - Creating tx2gene file from $PathGtfFile"
         mkdir -p "$referenceDir/genes/"
@@ -310,8 +311,7 @@ if [[ "$tx2gene_flag" -eq 1 ]]; then  # Run ONLY if -tx2gene flag is provided
         # Find the GTF file (now guaranteed to be .gtf.gz)
         pathFileGTF=$(find "$referenceDir/genes/" -type f -name "*.gtf.gz" | head -n 1)
         if [[ -f "$pathFileGTF" ]]; then
-            /usr/bin/time gtf2tx2gene "$pathFileGTF" ${referenceDir}/tx2gene.tsv
-            echo "$(date) - ${referenceDir}/tx2gene.tsv file successfuly created "
+            gtf2tx2gene "$pathFileGTF" ${referenceDir}/tx2gene.tsv
             rm -rf ${referenceDir}/genes/
         else
             echo "$(date) - ERROR: GTF file not found after copying."
@@ -321,18 +321,21 @@ if [[ "$tx2gene_flag" -eq 1 ]]; then  # Run ONLY if -tx2gene flag is provided
         echo "$(date) - Provided GTF file is invalid or missing."
         echo "$(date) - Downloading GTF file from Ensembl..."
         ensembl_species="${species,,}"  # Ensure lowercase species name
+        echo $ensembl_species
         request_gtf_fd="ftp://ftp.ensembl.org/pub/current_gtf/${ensembl_species}/"
+        echo $request_gtf_fd
         mkdir -p "$referenceDir/genes/"
         # Download the latest GTF
         wget -r -np -nd -q -P "$referenceDir/genes/" -A "*[0-9].gtf.gz" "$request_gtf_fd" || {
             echo "$(date) - ERROR: Failed to download GTF from Ensembl."
             exit 1
         }
+        echo "$(date) - The gtf files have been downloaded successfully"
         # Verify downloaded file
-        pathFileGTF=$(find "$referenceDir/genes/" -type f -name "*.gtf.gz" | head -n 1)
+        pathFileGTF=$(find "$referenceDir/genes/" -type f -regex ".*\.gtf\.gz" | head -n 1)
+
         if [[ -f "$pathFileGTF" ]]; then
-            /usr/bin/time gtf2tx2gene "$pathFileGTF" ${referenceDir}/tx2gene.tsv
-            echo "$(date) - ${referenceDir}/tx2gene.tsv file successfuly created "
+            gtf2tx2gene "$pathFileGTF" ${referenceDir}/tx2gene.tsv
             rm -rf ${referenceDir}/genes/
         else
             echo "$(date) - ERROR: No GTF file found after download."
