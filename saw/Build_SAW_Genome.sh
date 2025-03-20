@@ -131,8 +131,9 @@ if [[ -n "$PathGenFastaFile" && -n "$PathGtfFile" ]]; then
     pathFileCheckGTF="${referenceDir}/genes/$(basename "$pathFileGTF" .gtf).check.gtf"
 
     echo "$(date) - Checking GTF file format..."
-    saw checkGTF \
-    --input-gtf="$pathFileGTF" \
+
+    /usr/bin/time saw checkGTF \
+    --input-gtf="${pathFileGTF}" \
     --output-gtf="${pathFileCheckGTF}"
 
     echo "$(date) - GTF file check complete."
@@ -142,9 +143,9 @@ if [[ -n "$PathGenFastaFile" && -n "$PathGtfFile" ]]; then
     echo "$(date) - Creating genome..."
     /usr/bin/time saw makeRef \
         --mode=STAR \
-        --genome="${referenceDir}/genome" \
-        --fasta="$genomeFastaFiles" \
-        --gtf="${pathFileCheckGTF}" \
+        --genome="${referenceDir}/makeRef" \
+        --fasta="${genomeFastaFiles}" \
+        --gtf="${pathFileGTF}" \
         --threads-num="$threads"
 
 
@@ -153,7 +154,7 @@ else
 
     request_gtf_fd="ftp://ftp.ensembl.org/pub/current_gtf/${ensembl_species}/"
     request_fasta_fd="ftp://ftp.ensembl.org/pub/current_fasta/${ensembl_species}/dna/"
-    
+
     gtf_filename="*[0-9].gtf.gz"
     genome_filename="*.dna.primary_assembly.fa.gz"
                 
@@ -191,25 +192,25 @@ else
     echo "$(date) - The FASTA and GTF files have been downloaded successfully"
 
     pathFileGTF=$(find "${referenceDir}/genes/" -type f -regex "${referenceDir}/genes/"*.gtf | head -n 1)
-    filenameGTF=$(basename -- ${pathFileGTF})
-    ar=(${filenameGTF//[-.]/ })
-    assemblyVersion=$(echo ${ar[1]})
-    releaseEnsembl=$(echo ${ar[-2]})
+   
+    pathFileCheckGTF="${referenceDir}/genes/$(basename "$pathFileGTF" .gtf).check.gtf"
+
+    genomeFastaFiles=$(find "${referenceDir}/genome/" -type f -regex "${referenceDir}/genome/${species}.${assemblyVersion}.*.dna.\(primary_assembly\|toplevel\).fa" | head -n 1)
+
 
     echo "$(date) - Checking GTF file format..."
     /usr/bin/time saw checkGTF \
-    --input-gtf="$pathFileGTF" \
-    --output-gtf="${referenceDir}/genes/${species}.${assemblyVersion}.${releaseEnsembl}.check.gtf"
+    --input-gtf="${pathFileGTF}" \
+    --output-gtf="${pathFileCheckGTF}"
     echo "$(date) - GTF file check complete."
 
-    sjdbGTFfile=$(find "${referenceDir}/genes/" -type f -regex "${referenceDir}/genes/${species}.${assemblyVersion}."*.check.gtf | head -n 1)
-    genomeFastaFiles=$(find "${referenceDir}/genome/" -type f -regex "${referenceDir}/genome/${species}.${assemblyVersion}.*.dna.\(primary_assembly\|toplevel\).fa" | head -n 1)
 
     echo "$(date) - Creating genome..."
     /usr/bin/time saw makeRef \
         --mode=STAR \
-        --genome="${referenceDir}/genome" \
-        --fasta="$genomeFastaFiles" \
-        --gtf="$sjdbGTFfile" \
+        --genome="${referenceDir}/makeRef" \
+        --fasta="${genomeFastaFiles}" \
+        --gtf="${pathFileCheckGTF}" \
         --threads-num="$threads"
+    
 fi
