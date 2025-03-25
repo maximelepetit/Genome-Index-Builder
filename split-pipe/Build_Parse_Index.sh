@@ -26,7 +26,17 @@ usage() {
     "
     exit 1
 }
+sort_array() {
+    local array=("$@")
+    local sorted
 
+    if ! sorted=$(printf "%s\n" "${array[@]}" | sort); then
+        printf "Error: Sorting failed.\n" >&2
+        return 1
+    fi
+
+    printf "%s\n" "$sorted"
+}  
 activate_conda() {
     # Ensure the conda initialization script is sourced
     if [[ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]]; then
@@ -232,11 +242,23 @@ else
 
 fi
 
+
+
+ 
 genomeFastaFiles=($(find "${referenceDir}/genome/dna/" -type f -name "*.fa.gz"))
 annotationGTFFiles=($(find "${referenceDir}/genes/" -type f -name "*.gtf.gz"))
 
-log " - Creating Split-pipe index..."
 
+
+speciesNames=($(sort_array "${speciesNames[@]}"))
+
+annotationGTFFiles=($(sort_array "${annotationGTFFiles[@]}"))
+
+genomeFastaFiles=($(sort_array "${genomeFastaFiles[@]}"))
+
+
+
+log " - Creating Split-pipe index..."
 activate_conda
 
 
