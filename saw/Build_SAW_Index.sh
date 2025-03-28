@@ -21,6 +21,8 @@ usage() {
     -threads : Number of threads to use.
     -PathGenFastaFile : Path to genome FASTA file.
     -PathGtfFile : Path to GTF annotation file.
+    -rRNA : Flag to remove rRNA fragments.
+    -PathrRNAFastaFile : Path to GTF annotation file to create tx2gene file.
     "
     exit 1
 }
@@ -37,6 +39,8 @@ while [[ -n "$1" ]]; do
         -threads) threads="$2"; shift ;;
         -PathGenFastaFile) PathGenFastaFile="$2"; shift ;;
         -PathGtfFile) PathGtfFile="$2"; shift ;;
+        -rRNA) rRNA=1 ;;  
+        -PathrRNAFastaFile) PathrRNAFastaFile="$2"; shift ;;
         *) log " - Unknown option: $1"; usage ;;
     esac
     shift
@@ -192,15 +196,102 @@ log " - Checking GTF file format..."
  --output-gtf="${annotationCheckGTFFiles}"
 
 log " - GTF file check complete."
-log " - Creating Saw index..."
-    
-/usr/bin/time saw makeRef \
-    --mode=STAR \
-    --genome="${referenceDir}/makeRef" \
-    --fasta="${genomeFastaFiles}" \
-    --gtf="${annotationCheckGTFFiles}" \
-    --threads-num="$threads"
 
-log " - Saw index complete."
+
+
+
+if [[ "$rRNA" -eq 1 ]]; then  # Run ONLY if -rRNA flag is provided
+
+    mkdir -p "${referenceDir}/genome/rrna/"
+    if [[ -f "$PathrRNAFastaFile" && ( "$PathrRNAFastaFile" == *.fa || "$PathrRNAFastaFile" == *.fa.gz ) ]]; then
+
+        log " - Creating tx2gene file from $PathGtfFile"
+        cp "$PathrRNAFastaFile" "${referenceDir}/genome/rrna/"
+        # Compress if the file is a plain .gtf
+        if [[ "$PathrRNAFastaFile" == *.gz ]]; then
+            gunzip "${referenceDir}/genome/rrna/$(basename "$PathrRNAFastaFile")"
+        fi
+
+
+    else 
+        log " - rRNA FASTA file is invalid or not provided."
+        log " - Creating it ..."
+
+        ensembl_species="${speciesNames,,}"  # Ensure lowercase species name
+        request_nc_rna_fd="ftp://ftp.ensembl.org/pub/current_fasta/${ensembl_species}/ncrna/"
+        ncrna_filename="*.ncrna.fa.gz"
+        
+        wget -r -np -nd -q -P "${referenceDir}/genome/rrna/" -A "$ncrna_filename" "$request_nc_rna_fd" || {
+            log " - Failed to download NcRNA FASTA file from Ensembl."
+            exit 1
+
+        }
+        log " - The NcRNA FASTA files have been downloaded successfully"
+
+        
+
+        PathncRNAFastaFile=$(find "${referenceDir}/genome/rrna/" -type f -name "*.fa.gz" | head -n 1)
+        log " - Unzip downloaded files"
+
+        gunzip "${referenceDir}/genome/rrna/$(basename "$PathncRNAFastaFile")"
+
+        PathncRNAFastaFile=$(find "${referenceDir}/genome/rrna/" -type f -name "*.fa" | head -n 1)
+
+        if [[ ! -f "$PathncRNAFastaFile" ]]; then
+        echo "ERROR: Input FASTA file $PathncRNAFastaFile not found!"
+        exit 1
+        fi
+        gene_biotype=rRNA
+
+        # Define the output file
+        PathrRNAFastaFile="${referenceDir}/genome/rrna/$(basename "$PathncRNAFastaFile" ncrna.fa)${gene_biotype}.fa"
+
+        echo "Output rRNA FASTA file path: $PathrRNAFastaFile"
+
+        echo "Subsetting ncRNA FASTA file..."
+
+        awk '
+            BEGIN { keep=0 } 
+            /^>/ { 
+                keep = ($0 ~ /gene_biotype:rRNA/) ? 1 : 0 
+            } 
+            keep { print }
+        ' "$PathncRNAFastaFile" > "$PathrRNAFastaFile"
+
+        if [[ -f "$PathrRNAFastaFile" ]]; then
+        log " - The $gene_biotype FASTA file have been created successfully"
+            
+        else
+            log " - ERROR: $gene_biotype FASTA file not found."
+            exit 1
+        fi
+    
+        /usr/bin/time saw makeRef \
+            --mode=STAR \
+            --genome="${referenceDir}/makeRef" \
+            --fasta="${genomeFastaFiles}" \
+            --gtf="${annotationCheckGTFFiles}" \
+            --rRNA-fasta ${PathrRNAFastaFile} \
+            --threads-num="$threads"
+
+        log " - Saw index complete."            
+
+    fi
+
+else
+
+    log " - Creating Saw index..."
+    
+    /usr/bin/time saw makeRef \
+        --mode=STAR \
+        --genome="${referenceDir}/makeRef" \
+        --fasta="${genomeFastaFiles}" \
+        --gtf="${annotationCheckGTFFiles}" \
+        --threads-num="$threads"
+
+    log " - Saw index complete."
+
+
+fi
 
 rm -rf "${referenceDir}/genome/" "$referenceDir/genes/"

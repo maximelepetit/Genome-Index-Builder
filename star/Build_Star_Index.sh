@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
-#bash ./dev/preBuild_Genomev1.1.sh -outDir "/mnt/Data1/genomes/stomics" -species "Gallus_gallus" -sif "/home/labex-cortex/singularity_img/SAW_7.1.sif" -threads 20 -fasta "/mnt/Data1/genomes/gallus_gallus/GRCg6a/gallus_GRCg6a/GalGal_GRCg6a.fa.gz" -gtf "/mnt/Data1/genomes/gallus_gallus/GRCg6a/gallus_GRCg6a/GalGal_GRCg6a.gtf.gz" 
-# Function to replace spaces with underscores and capitalize the first letter of each word
+
 transform_and_capitalize() {
     echo "${1// /_}" | awk '{for(i=1;i<=NF;i++){$i=toupper(substr($i,1,1)) tolower(substr($i,2));}print}'
 }

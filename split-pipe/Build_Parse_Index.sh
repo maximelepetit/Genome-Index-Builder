@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-
 # Function to replace spaces with underscores and capitalize the first letter of each word
 transform_and_capitalize() {
     echo "${1// /_}" | awk '{for(i=1;i<=NF;i++){$i=toupper(substr($i,1,1)) tolower(substr($i,2));}print}'
@@ -28,15 +27,9 @@ usage() {
 }
 sort_array() {
     local array=("$@")
-    local sorted
-
-    if ! sorted=$(printf "%s\n" "${array[@]}" | sort); then
-        printf "Error: Sorting failed.\n" >&2
-        return 1
-    fi
-
-    printf "%s\n" "$sorted"
-}  
+    local sorted=($(printf "%s\n" "${array[@]}" | sort))
+    echo "${sorted[@]}"
+}
 activate_conda() {
     # Ensure the conda initialization script is sourced
     if [[ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]]; then
@@ -105,7 +98,7 @@ done
 
 
 # Check for mandatory arguments
-if [[ -z "$PathOutputReference" || -z "$speciesNames" || -z "$condaEnv" ]]; then
+if [[ -z "$PathOutputReference" || ${#speciesNames[@]} -eq 0 || -z "$condaEnv" ]]; then
     log " - Error: Missing required arguments."
     usage
 fi
@@ -159,7 +152,7 @@ if [[ -z  $threads ]] ; then
 else 
     # Check if threads is a valid positive integer
     if [[ ! "$threads" =~ ^[0-9]+$ ]]; then
-        log " - Threads '$threads' is not a valid positive integer"
+        log " - Threads $threads is not a valid positive integer"
         exit 1
     fi
 fi 
@@ -172,45 +165,37 @@ referenceDir="${PathOutputReference}/${speciesNames[0]}${speciesNames[1]:+_${spe
 
 
 if [ -d "${referenceDir}" ]; then
-    log " - Directory ${referenceDir} already exist. Remove ${referenceDir}"
+    log " - Directory $referenceDir already exist. Remove ${referenceDir}"
     exit 1
 else
-    log " - Directory ${referenceDir} does not exist. Creating directory."
+    log " - Directory $referenceDir does not exist. Creating directory."
     mkdir -p "$referenceDir"
     log " - Created new subdirectory: $referenceDir"
 fi
 
 # Use referenceDir for further operations
-log " - Using $referenceDir for your operations."
+log " - Using ${referenceDir} for your operations."
 
 
 
 
 # Create necessary directories
-mkdir -p "$referenceDir/genome/dna"  "$referenceDir/genes" 
-
-cd "$referenceDir" || {
-    log " - Failed to change directory to $referenceDir"
-    exit 1
-}
-
-
-
+mkdir -p "${referenceDir}/genome/dna"  "${referenceDir}/genes" 
 
 
 
 # Logic for handling species mix with provided files or single species
 if [[ ${#fastaFiles[@]} -ne 0 && ${#gtfFiles[@]} -ne 0 ]]; then
     for fasta in "${fastaFiles[@]}"; do
-        cp "$fasta" "$referenceDir/genome/dna"
+        cp "$fasta" "${referenceDir}/genome/dna"
         if [[ "$fasta" != *.gz ]]; then
-            gzip -f "$referenceDir/genome/dna/$(basename "$fasta")"
+            gzip -f "${referenceDir}/genome/dna/$(basename $fasta)"
         fi
     done
     for gtf in "${gtfFiles[@]}"; do
-        cp "$gtf" "$referenceDir/genes/"
+        cp "$gtf" "${referenceDir}/genes/"
         if [[ "$gtf" != *.gz ]]; then
-            gzip -f "$referenceDir/genes/$(basename "$gtf")"
+            gzip -f "${referenceDir}/genes/$(basename $gtf)"
         fi
     done
 
@@ -224,17 +209,17 @@ else
                 
         log " - Trying to download primary assembly file for $species from Ensembl..."
         genome_filename="*.dna.primary_assembly.fa.gz"
-        wget -r -np -nd -q -P "$referenceDir/genome/dna" -A "$genome_filename" "$request_fasta_fd" || {
+        wget -r -np -nd -q -P "${referenceDir}/genome/dna" -A "$genome_filename" "$request_fasta_fd" || {
         log " - Primary assembly file not found for $species. Trying to download toplevel file..."
         genome_filename="*.dna.toplevel.fa.gz"
-        wget -r -np -nd -q -P "$referenceDir/genome/dna" -A "$genome_filename" "$request_fasta_fd" || {
+        wget -r -np -nd -q -P "${referenceDir}/genome/dna" -A "$genome_filename" "$request_fasta_fd" || {
         log " - Failed to download DNA file for $species from Ensembl."
         exit 1
         }
         }
         log " - Trying to download GTF file for $species from Ensembl..."
         gtf_filename="*[0-9].gtf.gz"
-        wget -r -np -nd -q -P "$referenceDir/genes" -A "${gtf_filename}" "$request_gtf_fd" || {
+        wget -r -np -nd -q -P "${referenceDir}/genes" -A "${gtf_filename}" "$request_gtf_fd" || {
         log " - Failed to download GTF file for $species from Ensembl."
         exit 1
         }
@@ -273,4 +258,4 @@ activate_conda
 deactivate_conda
 
 log " - Split-pipe Index complete."
-rm -rf "${referenceDir}/genome/" "$referenceDir/genes/"
+rm -rf "${referenceDir}/genome/" "${referenceDir}/genes/"
