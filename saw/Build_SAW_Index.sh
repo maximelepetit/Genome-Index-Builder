@@ -11,7 +11,7 @@ log() {
 }
 
 usage() {
-    log " usage: $0 -PathOutputReference <path> -speciesNames <name> [-threads <num> -PathGenFastaFile <path> -PathGtfFile <path>]
+    log " usage: $0 -PathOutputReference <path> -speciesNames <name> [-threads <num> -PathGenFastaFile <path> -PathGtfFile <path> -rRNA -PathrRNAFastaFile <path> ]
     
     Required arguments:
     -PathOutputReference : Directory where reference will be created.
