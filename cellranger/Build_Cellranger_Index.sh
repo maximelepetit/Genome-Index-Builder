@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-
+# Function to replace spaces with underscores and capitalize the first letter of each word
 transform_and_capitalize() {
     echo "${1// /_}" | awk '{for(i=1;i<=NF;i++){$i=toupper(substr($i,1,1)) tolower(substr($i,2));}print}'
 }
@@ -11,21 +11,25 @@ log() {
 }
 
 usage() {
-    log " usage: $0 -PathOutputReference <path> -speciesNames <name> [-threads <num> -PathGenFastaFile <path> -PathGtfFile <path>]
-
+    log " usage: $0 -PathOutputReference <path> -speciesNames <name> [-threads <num> -PathGenFastaFile <path> -PathGtfFile <path> -checkGTF  ]
+    
     Required arguments:
     -PathOutputReference : Directory where reference will be created.
-    -speciesNames : Organism type of sample, usually referring to species.
+    -speciesNames : Organism type of sample, usually referring to species. 
 
     Optional arguments:
     -threads : Number of threads to use.
     -PathGenFastaFile : Path to genome FASTA file.
-    -PathGtfFile : Path to GTF annotation file to create tx2gene file.
+    -PathGtfFile : Path to GTF annotation file.
+    -checkGTF : Flag to remove rRNA fragments.
     "
     exit 1
 }
 # Initialize variables
+threads=4
 LC_TIME=fr_FR.UTF-8
+
+
 
 while [[ -n "$1" ]]; do
     case "$1" in
@@ -34,7 +38,8 @@ while [[ -n "$1" ]]; do
         -threads) threads="$2"; shift ;;
         -PathGenFastaFile) PathGenFastaFile="$2"; shift ;;
         -PathGtfFile) PathGtfFile="$2"; shift ;;
-        *) log " Unknown option: $1"; usage ;;
+        -checkGTF) checkGTF=1 ;;  
+        *) log " - Unknown option: $1"; usage ;;
     esac
     shift
 done
@@ -55,11 +60,11 @@ fi
 # If fasta and gtf are provided, validate them
 if [[ -n "$PathGenFastaFile" && -n "$PathGtfFile" ]]; then
     if [[ ! -f "$PathGenFastaFile" ]]; then
-        log " - Provided DNA fasta file does not exist: $PathGenFastaFile"
+        log " - Provided DNA fasta file does not exist: ${PathGenFastaFile}"
         exit 1
     fi
     if [[ ! -f "$PathGtfFile" ]]; then
-        log " - Provided GTF file does not exist: $PathGtfFile"
+        log " - Provided GTF file does not exist: ${PathGtfFile}"
         exit 1
     fi
 else
@@ -77,9 +82,10 @@ if [[ -n "$speciesNames" ]]; then
         exit 1
     else
         speciesNames=$(transform_and_capitalize "$speciesNames")
-        log " - Species: $speciesNames"
+        log " - Species: ${speciesNames}"
     fi
 fi
+
 
 if [[ -z  $threads ]] ; then
 
@@ -88,7 +94,7 @@ if [[ -z  $threads ]] ; then
 else 
     # Check if threads is a valid positive integer
     if [[ ! "$threads" =~ ^[0-9]+$ ]]; then
-        log " - Threads '$threads' is not a valid positive integer"
+        log " - Threads '${threads}' is not a valid positive integer"
         exit 1
     fi
 fi 
@@ -99,30 +105,32 @@ available_memory=$(( $(free | grep Mem | awk '{print $7}') * 1000 / 4 ))
 
 log " - Memory used: ${available_memory}"
 
+
 # Directories
 dateSuffix=$(date '+%Y_%m_%d')
 referenceDir="$PathOutputReference/$speciesNames/$dateSuffix"
 
 if [ -d "$referenceDir" ]; then
-    log " - Directory $referenceDir already exist. Remove $referenceDir please"
+    log " - Directory ${referenceDir} already exist. Remove ${referenceDir} please"
     exit 1
 else
-    log " - Directory $referenceDir does not exist. Creating directory."
+    log " - Directory ${referenceDir} does not exist. Creating directory."
     mkdir -p "$referenceDir"
-    log " - Created new subdirectory: $referenceDir"
+    log " - Created new subdirectory: ${referenceDir}"
 fi
 
 # Use referenceDir for further operations
-log " - Using $referenceDir for your operations."
+log " - Using ${referenceDir} for your operations."
 
 
 # Create necessary directories
-mkdir -p "$referenceDir/genome/dna"  "$referenceDir/genes"
+mkdir -p "${referenceDir}/genome/dna" "${referenceDir}/genes"
 
 
 
+# Logic for custom files
 if [[ -n "$PathGenFastaFile" && -n "$PathGtfFile" ]]; then
-    cp "$PathGenFastaFile" "$referenceDir/genome/dna/"
+    cp "$PathGenFastaFile" "$referenceDir/genome/dna"
     cp "$PathGtfFile" "$referenceDir/genes/"
     
     if [[ "$PathGenFastaFile" == *.gz ]]; then
@@ -132,6 +140,7 @@ if [[ -n "$PathGenFastaFile" && -n "$PathGtfFile" ]]; then
     if [[ "$PathGtfFile" == *.gz ]]; then
         gunzip -f "$referenceDir/genes/$(basename "$PathGtfFile")"
     fi
+
 
 else
     ensembl_species="${speciesNames,,}"
@@ -143,12 +152,12 @@ else
     genome_filename="*.dna.primary_assembly.fa.gz"
                 
     log " - Trying to download primary assembly file from Ensembl..."
-    wget -r -np -nd -q -P "$referenceDir/genome/dna/" \
+    wget -r -np -nd -q -P "$referenceDir/genome/dna" \
         -A "$genome_filename" \
         "$request_fasta_fd" || {
         log " - Primary assembly file not found. Trying to download toplevel file..."
         genome_filename="*.dna.toplevel.fa.gz"
-        wget -r -np -nd -q -P "$referenceDir/genome/dna/" \
+        wget -r -np -nd -q -P "$referenceDir/genome/dna" \
             -A "$genome_filename" \
             "$request_fasta_fd" || {
             log " - Failed to download DNA file from Ensembl."
@@ -157,33 +166,70 @@ else
     }
 
     log " - Trying to download GTF file from Ensembl..."
-    wget -r -np -nd -q -P "$referenceDir/genes" -A "${gtf_filename}" "$request_gtf_fd" || {
+    wget -r -np -nd -q -P "${referenceDir}/genes" -A "${gtf_filename}" "$request_gtf_fd" || {
         log " - Failed to download GTF file from Ensembl."
         exit 1
     }
 
     log " - Unzip downloaded files"
-    gunzip -f "$referenceDir/genome/dna/"*.fa.gz || {
+    gunzip -f "${referenceDir}/genome/dna/"*.fa.gz || {
         log " - Failed to unzip DNA files."
         exit 1
     }
 
-    gunzip -f "$referenceDir/genes/"*.gtf.gz || {
+    gunzip -f "${referenceDir}/genes/"*.gtf.gz || {
         log " - Failed to unzip GTF files."
         exit 1
     }
-   
+
+    log " - The FASTA and GTF files have been downloaded successfully"
+    
 fi
-genomeFastaFiles=($(find "${referenceDir}/genome/dna/" -type f -name "*.fa"))
+
 annotationGTFFiles=($(find "${referenceDir}/genes/" -type f -name "*.gtf"))
+genomeFastaFiles=($(find "${referenceDir}/genome/dna/" -type f -name "*.fa"))
 
-log " - Creating Star index..."
-/usr/bin/time STAR --runMode genomeGenerate \
-    --runThreadN $threads \
-    --genomeDir $referenceDir \
-    --genomeFastaFiles $genomeFastaFiles \
-    --sjdbGTFfile $annotationGTFFiles  \
-    --limitGenomeGenerateRAM=$available_memory
+if [[ "$checkGTF" -eq 1 ]]; then  # Run ONLY if -checkGTF flag is provided
 
-log "- Star index complete."
+    annotationFilteredGTFFiles="${referenceDir}/genes/$(basename "$annotationGTFFiles" .gtf).check.gtf"
+
+    log " - Running  mkgtf..."
+
+
+    cellranger mkgtf ${annotationGTFFiles} ${annotationFilteredGTFFiles} \
+                    --attribute=gene_biotype:protein_coding \
+                    --attribute=gene_biotype:lncRNA \
+                    --attribute=gene_biotype:antisense \
+                    --attribute=gene_biotype:IG_LV_gene \
+                    --attribute=gene_biotype:IG_V_gene \
+                    --attribute=gene_biotype:IG_V_pseudogene \
+                    --attribute=gene_biotype:IG_D_gene \
+                    --attribute=gene_biotype:IG_J_gene \
+                    --attribute=gene_biotype:IG_J_pseudogene \
+                    --attribute=gene_biotype:IG_C_gene \
+                    --attribute=gene_biotype:IG_C_pseudogene \
+                    --attribute=gene_biotype:TR_V_gene \
+                    --attribute=gene_biotype:TR_V_pseudogene \
+                    --attribute=gene_biotype:TR_D_gene \
+                    --attribute=gene_biotype:TR_J_gene \
+                    --attribute=gene_biotype:TR_J_pseudogene \
+                    --attribute=gene_biotype:TR_C_gene
+
+
+    log " - mkgtf complete."
+    annotationGTFFiles=$annotationFilteredGTFFiles
+fi
+
+
+
+log " - Creating Cellranger index..."
+cellranger mkref \
+    --output-dir "${referenceDir}/makeRef" \
+    --genome ${speciesNames} \
+    --fasta ${genomeFastaFiles} \
+    --genes ${annotationGTFFiles} \
+    --nthreads ${threads} \
+    --memgb ${available_memory}
+
+log " - Cellranger Index complete."
 rm -rf "${referenceDir}/genome/" "$referenceDir/genes/"
