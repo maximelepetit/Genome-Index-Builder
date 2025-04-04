@@ -13,15 +13,16 @@ log() {
 usage() {
     log " usage: $0 -PathOutputReference <path> -speciesNames <name> [-threads <num> -PathGenFastaFile <path> -PathGtfFile <path> -checkGTF  ]
     
-    Required arguments:
-    -PathOutputReference : Directory where reference will be created.
-    -speciesNames : Organism type of sample, usually referring to species. 
+Required arguments:
+    -PathOutputReference   : Directory where reference will be created.
+    -speciesNames          : Organism type of sample, usually referring to species. 
 
-    Optional arguments:
-    -threads : Number of threads to use.
-    -PathGenFastaFile : Path to genome FASTA file.
-    -PathGtfFile : Path to GTF annotation file.
-    -checkGTF : Flag to remove rRNA fragments.
+Optional arguments:
+    -threads               : Number of threads to use.
+    -memory                : Maximum memory [Gb] allocated for the pipeline . (default: free / 2)
+    -PathGenFastaFile      : Path to genome FASTA file.
+    -PathGtfFile           : Path to GTF annotation file.
+    -checkGTF              : Flag to check GTF annotation file format.
     "
     exit 1
 }
@@ -36,6 +37,7 @@ while [[ -n "$1" ]]; do
         -PathOutputReference) PathOutputReference="$2"; shift ;;
         -speciesNames) speciesNames="$2"; shift ;;
         -threads) threads="$2"; shift ;;
+        -memory) memory="$2"; shift ;;
         -PathGenFastaFile) PathGenFastaFile="$2"; shift ;;
         -PathGtfFile) PathGtfFile="$2"; shift ;;
         -checkGTF) checkGTF=1 ;;  
@@ -101,9 +103,17 @@ fi
 
 log " - Threads: $threads"
 
-available_memory=$(( $(free | grep Mem | awk '{print $7}') * 1000 / 4 ))
+if [[ -z  $memory ]] ; then
+    memory=$(( $(free | grep Mem | awk '{print $7}') / 1000000 / 4 ))
+else 
+    # Check if threads is a valid positive integer
+   if ! [[ "$memory" =~ ^[1-9][0-9]*$ ]]; then
+    log "Error: Memory must be a positive integer."
+    exit 1
+    fi
+fi
 
-log " - Memory used: ${available_memory}"
+log " - Memory used: ${memory} Gb"
 
 
 # Directories
@@ -223,13 +233,14 @@ fi
 
 
 log " - Creating Cellranger index..."
+log " - Running  mkref..."
 cellranger mkref \
     --output-dir "${referenceDir}/makeRef" \
     --genome ${speciesNames} \
     --fasta ${genomeFastaFiles} \
     --genes ${annotationGTFFiles} \
     --nthreads ${threads} \
-    --memgb ${available_memory}
+    --memgb ${memory}
 
 log " - Cellranger Index complete."
-rm -rf "${referenceDir}/genome/" "$referenceDir/genes/"
+rm -rf "${referenceDir}/genome/" "${referenceDir}/genes/"
