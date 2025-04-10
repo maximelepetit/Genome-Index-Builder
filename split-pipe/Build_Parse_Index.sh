@@ -13,15 +13,15 @@ log() {
 usage() {
     log " Usage: $0 -PathOutputReference <dir> -speciesNames <species1> [<species2>] -condaEnv <name> [-threads <num> -PathGenFastaFile <path> [<path>] -PathGtfFile <path> [<path>]]
     
-    Required arguments:
-    -PathOutputReference : Directory where reference will be created.
-    -speciesNames : Organism type of sample, usually referring to species.
-    -condaEnv : Conda environment with Split-Pipe installed.
+Required arguments:
+    -PathOutputReference   : Directory where reference will be created.
+    -speciesNames          : Organism type of sample, usually referring to species.
+    -condaEnv              : Conda environment with Split-Pipe installed.
 
-    Optional arguments:
-    -threads : Number of threads to use.
-    -PathGenFastaFile : Path to genome FASTA file(s). [1 or 2 paths]
-    -PathGtfFile : Path to GTF annotation file(s). [1 or 2 paths]
+Optional arguments:
+    -threads               : Number of threads to use.
+    -PathGenFastaFile      : Path to genome FASTA file(s). [1 or 2 paths]
+    -PathGtfFile           : Path to GTF annotation file(s). [1 or 2 paths]
     "
     exit 1
 }

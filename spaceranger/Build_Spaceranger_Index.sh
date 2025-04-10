@@ -203,10 +203,10 @@ if [[ "$checkGTF" -eq 1 ]]; then  # Run ONLY if -checkGTF flag is provided
 
     annotationFilteredGTFFiles="${referenceDir}/genes/$(basename "$annotationGTFFiles" .gtf).check.gtf"
 
-    log " - Running Cellranger mkgtf..."
+    log " - Running Spaceranger mkgtf..."
 
 
-    cellranger mkgtf ${annotationGTFFiles} ${annotationFilteredGTFFiles} \
+    spaceranger mkgtf ${annotationGTFFiles} ${annotationFilteredGTFFiles} \
                     --attribute=gene_biotype:protein_coding \
                     --attribute=gene_biotype:lncRNA \
                     --attribute=gene_biotype:antisense \
@@ -226,15 +226,15 @@ if [[ "$checkGTF" -eq 1 ]]; then  # Run ONLY if -checkGTF flag is provided
                     --attribute=gene_biotype:TR_C_gene
 
 
-    log " - Cellranger mkgtf complete."
+    log " - Spaceranger mkgtf complete."
     annotationGTFFiles=$annotationFilteredGTFFiles
 fi
 
 
 
-log " - Creating Cellranger index..."
-log " - Running Cellranger mkref..."
-cellranger mkref \
+log " - Creating Spaceranger index..."
+log " - Running Spaceranger mkref..."
+spaceranger mkref \
     --output-dir "${referenceDir}/makeRef" \
     --genome ${speciesNames} \
     --fasta ${genomeFastaFiles} \
@@ -242,5 +242,5 @@ cellranger mkref \
     --nthreads ${threads} \
     --memgb ${memory}
 
-log " - Cellranger Index complete."
+log " - Spaceranger Index complete."
 rm -rf "${referenceDir}/genome/" "${referenceDir}/genes/"
