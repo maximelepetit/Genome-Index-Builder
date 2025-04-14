@@ -208,6 +208,7 @@ if [[ "$checkGTF" -eq 1 ]]; then  # Run ONLY if -checkGTF flag is provided
 
     cellranger mkgtf ${annotationGTFFiles} ${annotationFilteredGTFFiles} \
                     --attribute=gene_biotype:protein_coding \
+                    --attribute=gene_biotype:protein_coding_LoF \
                     --attribute=gene_biotype:lncRNA \
                     --attribute=gene_biotype:antisense \
                     --attribute=gene_biotype:IG_LV_gene \
