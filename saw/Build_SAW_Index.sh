@@ -22,7 +22,8 @@ usage() {
     -PathGenFastaFile : Path to genome FASTA file.
     -PathGtfFile : Path to GTF annotation file.
     -rRNA : Flag to remove rRNA fragments.
-    -PathrRNAFastaFile : Path to GTF annotation file to create tx2gene file.
+    -PathrRNAFastaFile : .
+    -rds : Flag to convert Gem files to Rds
     "
     exit 1
 }
@@ -184,18 +185,21 @@ else
 fi
 
 
+
+
+
+### Deprecated since saw 8.2 
+#log " - Checking GTF file format..."
+
 genomeFastaFiles=($(find "${referenceDir}/genome/dna/" -type f -name "*.fa"))
 annotationGTFFiles=($(find "${referenceDir}/genes/" -type f -name "*.gtf"))
 
-annotationCheckGTFFiles="${referenceDir}/genes/$(basename "$annotationGTFFiles" .gtf).check.gtf"
+#annotationCheckGTFFiles="${referenceDir}/genes/$(basename "$annotationGTFFiles" .gtf).check.gtf"
+#/usr/bin/time saw checkGTF \
+# --input-gtf="${annotationGTFFiles}" \
+# --output-gtf="${annotationCheckGTFFiles}"
 
-log " - Checking GTF file format..."
-
-/usr/bin/time saw checkGTF \
- --input-gtf="${annotationGTFFiles}" \
- --output-gtf="${annotationCheckGTFFiles}"
-
-log " - GTF file check complete."
+#log " - GTF file check complete."
 
 
 
@@ -270,7 +274,7 @@ if [[ "$rRNA" -eq 1 ]]; then  # Run ONLY if -rRNA flag is provided
             --mode=STAR \
             --genome="${referenceDir}/makeRef" \
             --fasta="${genomeFastaFiles}" \
-            --gtf="${annotationCheckGTFFiles}" \
+            --gtf="${annotationGTFFiles}" \
             --rRNA-fasta ${PathrRNAFastaFile} \
             --threads-num="$threads"
 
@@ -286,7 +290,7 @@ else
         --mode=STAR \
         --genome="${referenceDir}/makeRef" \
         --fasta="${genomeFastaFiles}" \
-        --gtf="${annotationCheckGTFFiles}" \
+        --gtf="${annotationGTFFiles}" \
         --threads-num="$threads"
 
     log " - Saw index complete."

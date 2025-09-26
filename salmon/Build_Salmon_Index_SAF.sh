@@ -45,39 +45,34 @@ gtf2tx2gene() {
   local output="${2:-tx2gene_ensemble.tsv}"
 
   zless "$input" | grep -v "^#" | \
-  awk 'BEGIN {
-    FS="\t"; OFS="\t"
-  }
-  $3 == "transcript" {
-    # Split the 9th column (attributes) by ";" to extract fields
-    n = split($9, attr, ";");
-    gene_id = "";
-    transcript_id = "";
-    
-    # Loop through the attributes to extract gene_id and transcript_id
-    for(i = 1; i <= n; i++){
-      gsub(/^ +| +$/, "", attr[i]);
-      
-      # If the attribute starts with gene_id
-      if(attr[i] ~ /^gene_id/){
-        split(attr[i], tmp, " ");
-        # tmp[2] contains the value (with quotes, which are removed)
-        gene_id = tmp[2];
-        gsub(/"/, "", gene_id);
-      }
-      # If the attribute starts with transcript_id
-      else if(attr[i] ~ /^transcript_id/){
-        split(attr[i], tmp, " ");
-        transcript_id = tmp[2];
-        gsub(/"/, "", transcript_id);
-      }
+    awk 'BEGIN {
+        FS="\t"; OFS="\t"
     }
-
-    # Print only if both fields were found
-    if(gene_id != "" && transcript_id != ""){
-      print transcript_id, gene_id
+    $3 == "transcript" {
+        n = split($9, attr, ";");
+        gene_id = ""; transcript_id = "";
+        for (i = 1; i <= n; i++) {
+        gsub(/^ +| +$/, "", attr[i]);
+        if (attr[i] ~ /^gene_id/) {
+            split(attr[i], tmp, " ");
+            gene_id = tmp[2]; gsub(/"/, "", gene_id);
+        } else if (attr[i] ~ /^transcript_id/) {
+            split(attr[i], tmp, " ");
+            transcript_id = tmp[2]; gsub(/"/, "", transcript_id);
+        }
+        }
+        if (gene_id != "" && transcript_id != "" && !seen[transcript_id]++) {
+        if (transcript_id ~ /^ENS/) {
+            ens[transcript_id] = gene_id
+        } else {
+            other[transcript_id] = gene_id
+        }
+        }
     }
-  }' | sort -u > "$output"
+    END {
+        for (t in ens)   print t, ens[t]
+        for (t in other) print t, other[t]
+    }' > "$output"
   
   echo "tx2gene Files generated: $output"
 }
