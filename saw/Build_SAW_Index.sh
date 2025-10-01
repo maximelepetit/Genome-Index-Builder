@@ -22,8 +22,7 @@ usage() {
     -PathGenFastaFile : Path to genome FASTA file.
     -PathGtfFile : Path to GTF annotation file.
     -rRNA : Flag to remove rRNA fragments.
-    -PathrRNAFastaFile : .
-    -rds : Flag to convert Gem files to Rds
+    -PathrRNAFastaFile : Path to rFASTA file.
     "
     exit 1
 }
@@ -106,7 +105,7 @@ log " - Threads: $threads"
 
 # Directories
 dateSuffix=$(date '+%Y_%m_%d')
-referenceDir="$PathOutputReference/$speciesNames/$dateSuffix"
+referenceDir="$PathOutputReference/$dateSuffix"
 
 if [ -d "$referenceDir" ]; then
     log " - Directory $referenceDir already exist. Remove $referenceDir please"
@@ -209,7 +208,6 @@ if [[ "$rRNA" -eq 1 ]]; then  # Run ONLY if -rRNA flag is provided
     mkdir -p "${referenceDir}/genome/rrna/"
     if [[ -f "$PathrRNAFastaFile" && ( "$PathrRNAFastaFile" == *.fa || "$PathrRNAFastaFile" == *.fa.gz ) ]]; then
 
-        log " - Creating tx2gene file from $PathGtfFile"
         cp "$PathrRNAFastaFile" "${referenceDir}/genome/rrna/"
         # Compress if the file is a plain .gtf
         if [[ "$PathrRNAFastaFile" == *.gz ]]; then
